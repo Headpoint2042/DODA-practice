@@ -1,0 +1,15 @@
+services:
+  a:
+    image: nginx
+    volumes:
+      - ./html_a:/usr/share/nginx/html/
+  b:
+    image: nginx
+    volumes:
+      - ./html_b:/usr/share/nginx/html/
+  proxy:
+    image: nginx
+    ports:
+      - 8080:80
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
