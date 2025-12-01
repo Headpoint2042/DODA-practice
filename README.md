@@ -317,6 +317,307 @@ vagrant resume
 vagrant destroy
 ```
 
+# Kubernetes
+
+## 1. Start the Cluster
+
+To begin working with Kubernetes locally, you will use **Minikube**, a lightweight Kubernetes implementation that runs on your local machine. It provides a single-node cluster suitable for learning and development.
+
+### Start Minikube with the Docker Driver
+
+Using Docker as the backend avoids the overhead of running a full VM.
+
+```bash
+minikube start --driver=docker
+```
+
+This command:
+- Creates a single-node Kubernetes cluster
+- Configures `kubectl` automatically to use the `minikube` context
+- Pulls required Kubernetes images
+
+### Enable the Ingress Addon
+
+Ingress controllers are not enabled by default. You need one to support HTTP routing into your cluster.
+
+```bash
+minikube addons enable ingress
+```
+
+This installs the **Ingress-Nginx Controller**, which will manage incoming HTTP(S) traffic.
+
+### Verify the Cluster and Open Dashboard
+
+Check that the control plane is running:
+
+```bash
+kubectl cluster-info
+```
+
+Run the Minikube dashboard:
+
+```bash
+minikube dashboard
+```
+
+The dashboard provides:
+- Live overview of pods, services, deployments
+- Integrated logs view
+- Quick access to exec into containers
+- Visual inspection of resource configuration
+
+---
+
+## 2. Pods
+
+A **Pod** is the smallest deployable unit in Kubernetes. It typically runs one container but can run more if needed.
+
+### Deploying a Pod
+
+You create a Pod using a YAML manifest such as `simple-pod.yml`, which runs `nginx:1.14.2`.
+
+Deploy it:
+
+```bash
+kubectl apply -f simple-pod.yml
+```
+
+### Inspecting Pods
+
+List running Pods:
+
+```bash
+kubectl get pods -o wide
+```
+
+Get detailed configuration and status:
+
+```bash
+kubectl describe pods
+```
+
+This shows:
+- Container image
+- Events
+- Labels
+- IP and node placement
+- Volumes
+- Environment variables
+
+### Interacting with a Pod
+
+Forward a port from your machine to the Pod:
+
+```bash
+kubectl port-forward nginx 1234:80
+```
+
+Check logs:
+
+```bash
+kubectl logs nginx
+```
+
+Enter the Pod interactively:
+
+```bash
+kubectl exec -it nginx -- bash
+```
+
+### Deleting Pods
+
+```bash
+kubectl delete -f simple-pod.yml
+```
+
+This stops and removes the Pod from the cluster.
+
+---
+
+## 3. Services and Ingress
+
+Pods are ephemeral and not meant to be accessed directly. **Services** provide stable networking while **Ingress** exposes HTTP(S) traffic externally.
+
+---
+
+### NodePort Service
+
+A NodePort:
+- Exposes a Service on a static port between 30000-32767
+- Allows external access via `<NodeIP>:<NodePort>`
+
+After defining a NodePort in `service.yml`, apply it:
+
+```bash
+kubectl apply -f service.yml
+```
+
+Check services:
+
+```bash
+kubectl get services
+```
+
+Find the node IP:
+
+```bash
+kubectl get nodes -o wide
+```
+
+Minikube simplifies access:
+
+```bash
+minikube service my-service --url
+```
+
+This automatically opens a tunnel if required.
+
+---
+
+### Ingress
+
+Ingress provides:
+- Host-based routing (e.g., api.example.com)
+- Path-based routing (e.g., /api, /dashboard)
+- Centralized entry point on port 80/443
+
+After defining an Ingress referencing a ClusterIP service:
+
+```bash
+kubectl apply -f ingress.yml
+```
+
+Start the tunnel to expose ports 80/443:
+
+```bash
+minikube tunnel
+```
+
+Then open:
+
+- http://localhost
+
+---
+
+## 4. Deployments
+
+A **Deployment** provides:
+- Replica management
+- Rolling updates
+- Self-healing
+- Declarative Pod templates
+
+### Apply the Deployment
+
+```bash
+kubectl apply -f deployment.yml
+minikube tunnel
+```
+
+List Pods:
+
+```bash
+kubectl get pods
+```
+
+### Self-Healing Capabilities
+
+Delete a Pod:
+
+```bash
+kubectl delete pod <pod-name>
+```
+
+Kubernetes will recreate the missing Pod automatically to match the desired replica count.
+
+### Scaling a Deployment
+
+Increase replicas in the YAML:
+
+```yaml
+replicas: 5
+```
+
+Apply changes:
+
+```bash
+kubectl apply -f deployment.yml
+```
+
+Kubernetes will add or remove Pods to match the new number.
+
+---
+
+## 5. Environment Variables and Storage
+
+### ConfigMap and Secret
+
+**ConfigMaps** store configuration that is not sensitive.
+
+**Secrets** store sensitive data encoded in base64.
+
+Apply both resources:
+
+```bash
+kubectl apply -f environment.yml
+```
+
+View them in the Minikube dashboard to inspect stored keys and values.
+
+---
+
+### Pod Environment Injection
+
+A Pod can load values from ConfigMaps and Secrets using `env.valueFrom`.
+
+After deploying:
+
+```bash
+kubectl port-forward showenv 1234:8080
+```
+
+Open the app to verify environment variables:
+- `USERNAME` (from ConfigMap)
+- `FOO` (from Secret)
+
+---
+
+### Volumes
+
+A **hostPath** volume maps a directory from the Kubernetes node into a container.
+
+Since the volume config cannot be merged dynamically, delete and re-apply:
+
+```bash
+kubectl delete -f environment.yml
+kubectl apply -f environment.yml
+```
+
+### Test Persistence
+
+Write a file:
+
+```bash
+kubectl exec -it showenv -- touch /data_inside/i_was_here
+```
+
+Restart Pod and verify:
+
+```bash
+kubectl exec -it showenv -- ls /data_inside
+```
+
+### Inspect Host Path
+
+Minikube runs inside a VM or container. To inspect the actual path:
+
+```bash
+minikube ssh
+ls /data_outside
+```
+
+This confirms that the volume persists across Pod recreation.
+
 
 
 
